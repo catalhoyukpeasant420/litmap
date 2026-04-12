@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Literarische Karte</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ink: #1a1208;
+    --bg: #f7f5f2;
+    --surface: #ffffff;
+    --muted: #6b6560;
+    --border: #ddd9d4;
+    --accent: #c45a18;
+    --accent2: #1a65b8;
+    --radius: 8px;
+  }
+
+  html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--ink); }
+
+  #app { display: flex; flex-direction: column; height: 100vh; }
+
+  /* ── Toolbar ── */
+  #toolbar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  #toolbar h1 { font-size: 16px; font-weight: 600; flex: 1; letter-spacing: -.01em; }
+  #toolbar h1 span { color: var(--accent); font-weight: 400; font-style: italic; }
+  .tbtn {
+    font-size: 12px; padding: 5px 12px;
+    border-radius: var(--radius); border: 1px solid var(--border);
+    background: var(--surface); color: var(--ink); cursor: pointer;
+    transition: background .15s;
+  }
+  .tbtn:hover { background: var(--bg); }
+
+  /* ── Main ── */
+  #main { display: flex; flex: 1; overflow: hidden; }
+
+  /* ── Sidebar ── */
+  #sidebar {
+    width: 300px; flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  #tabs { display: flex; border-bottom: 1px solid var(--border); }
+  .tab {
+    flex: 1; padding: 10px 4px; text-align: center; cursor: pointer;
+    font-size: 12px; font-weight: 500; letter-spacing: .04em;
+    color: var(--muted); border-bottom: 2px solid transparent;
+    user-select: none; transition: color .15s;
+  }
+  .tab.on { color: var(--ink); border-bottom-color: var(--accent); }
+
+  #panel { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+
+  /* ── Form ── */
+  .fg { display: flex; flex-direction: column; gap: 4px; }
+  .lbl { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  input[type=text], input[type=url], textarea {
+    width: 100%; font-size: 13px; padding: 7px 9px;
+    border-radius: var(--radius); border: 1px solid var(--border);
+    background: var(--bg); color: var(--ink); outline: none;
+    transition: border-color .15s; font-family: inherit;
+  }
+  input:focus, textarea:focus { border-color: #aaa; background: #fff; }
+  textarea { resize: vertical; min-height: 52px; }
+
+  .cover-drop {
+    border: 1.5px dashed var(--border); border-radius: var(--radius);
+    padding: 12px; text-align: center; cursor: pointer;
+    font-size: 12px; color: var(--muted); background: var(--bg);
+    transition: border-color .15s;
+  }
+  .cover-drop:hover { border-color: #aaa; }
+  .cover-drop img { max-height: 88px; max-width: 100%; display: block; margin: 0 auto 6px; border-radius: 5px; }
+
+  .mode-row { display: flex; gap: 6px; }
+  .mbtn {
+    flex: 1; padding: 6px 4px; font-size: 12px;
+    border-radius: var(--radius); border: 1px solid var(--border);
+    background: var(--bg); color: var(--muted); cursor: pointer; font-family: inherit;
+    transition: all .15s;
+  }
+  .mbtn.on { background: var(--ink); border-color: var(--ink); color: #fff; }
+
+  .hint {
+    font-size: 12px; padding: 8px 10px; border-radius: var(--radius);
+    background: #fffbea; color: #856404; border: 1px solid #f0e060; text-align: center;
+  }
+
+  .ploc {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 7px; border-radius: var(--radius); border: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .ploc-idx {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: var(--muted); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700; flex-shrink: 0;
+  }
+  .ploc input {
+    flex: 1; font-size: 12px; border: none;
+    border-bottom: 1px solid var(--border); background: transparent;
+    color: var(--ink); padding: 1px 3px; outline: none; font-family: inherit;
+  }
+  .rm { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 16px; padding: 0 2px; line-height: 1; }
+  .rm:hover { color: #c00; }
+
+  .save-btn {
+    width: 100%; padding: 9px; font-size: 14px; font-weight: 600;
+    border-radius: var(--radius); border: none;
+    background: var(--ink); color: #fff; cursor: pointer; font-family: inherit;
+    margin-top: 4px; transition: opacity .15s;
+  }
+  .save-btn:hover { opacity: .85; }
+  .cancel-btn {
+    width: 100%; padding: 7px; font-size: 13px;
+    border-radius: var(--radius); border: 1px solid var(--border);
+    background: transparent; color: var(--ink); cursor: pointer; font-family: inherit; margin-top: 4px;
+  }
+  .add-loc-btn {
+    width: 100%; padding: 7px; font-size: 12px; margin-top: 5px;
+    border-radius: var(--radius); border: 1px solid var(--border);
+    background: var(--bg); cursor: pointer; color: var(--ink); font-family: inherit;
+    transition: background .15s;
+  }
+  .add-loc-btn:hover { background: #eee; }
+
+  /* ── Book list ── */
+  .book-item {
+    display: flex; gap: 9px; padding: 9px;
+    border-radius: var(--radius); border: 1px solid var(--border);
+    cursor: pointer; position: relative; background: var(--surface);
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .book-item:hover { border-color: #bbb; box-shadow: 0 1px 6px rgba(0,0,0,.06); }
+  .bthumb { width: 38px; height: 54px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border); flex-shrink: 0; }
+  .bph {
+    width: 38px; height: 54px; border-radius: 4px; border: 1px solid var(--border);
+    background: var(--bg); display: flex; align-items: center; justify-content: center;
+    font-size: 20px; flex-shrink: 0;
+  }
+  .bi { flex: 1; min-width: 0; padding-right: 18px; }
+  .bt { font-size: 13px; font-weight: 600; line-height: 1.3; }
+  .ba { font-size: 11px; color: var(--muted); margin-top: 2px; font-style: italic; }
+  .bl { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .delbtn {
+    position: absolute; top: 6px; right: 7px;
+    background: none; border: none; color: #ccc; cursor: pointer;
+    font-size: 16px; padding: 0; line-height: 1; transition: color .15s;
+  }
+  .delbtn:hover { color: #c00; }
+  .empty { text-align: center; padding: 32px 10px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+
+  /* ── Map ── */
+  #mapwrap { flex: 1; position: relative; }
+  #map { width: 100%; height: 100%; }
+
+  /* ── Leaflet popup ── */
+  .lpopup { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-width: 160px; max-width: 210px; }
+  .lpopup img { width: 100%; max-height: 120px; object-fit: cover; border-radius: 6px; margin-bottom: 8px; display: block; }
+  .lpopup .pt { font-size: 14px; font-weight: 600; line-height: 1.3; }
+  .lpopup .pa { font-size: 12px; color: #777; font-style: italic; margin-top: 2px; }
+  .lpopup .pn { font-size: 11px; color: #999; margin-top: 4px; }
+  .lpopup .pd { font-size: 12px; color: #555; margin-top: 6px; border-top: 1px solid #eee; padding-top: 6px; }
+  .leaflet-popup-content-wrapper { border-radius: 10px !important; box-shadow: 0 4px 16px rgba(0,0,0,.15) !important; }
+  .leaflet-popup-content { margin: 14px 16px !important; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="toolbar">
+    <h1>Literarische <span>Karte</span></h1>
+    <button class="tbtn" onclick="exportData()">↓ Export</button>
+    <label class="tbtn" style="cursor:pointer">
+      ↑ Import
+      <input type="file" accept=".json" onchange="importData(event)" style="display:none">
+    </label>
+  </div>
+  <div id="main">
+    <div id="sidebar">
+      <div id="tabs">
+        <div class="tab on" id="tab-list" onclick="switchTab('list')">Bücher</div>
+        <div class="tab" id="tab-add" onclick="switchTab('add')">+ Hinzufügen</div>
+      </div>
+      <div id="panel"></div>
+    </div>
+    <div id="mapwrap">
+      <div id="map"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Map setup ─────────────────────────────────────────────────────────────────
+const map = L.map('map', { center: [48.5, 11.0], zoom: 6 });
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19,
+  attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+}).addTo(map);
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let books = [];
+try { books = JSON.parse(localStorage.getItem('litKarte5') || '[]'); } catch {}
+
+let tab = 'list', picking = false, locMode = 'single', pickedLocs = [];
+let fTitle = '', fAuthor = '', fDesc = '', fCover = '', editId = null;
+
+const COLORS = ['#c45a18','#1a9e6a','#1a65b8','#9e1a5a','#6a8e1a','#7a3ab8','#c4881a','#1a8e9e'];
+const layers = {};
+let tempLayers = [];
+
+// ── Icons ──────────────────────────────────────────────────────────────────────
+function mkIcon(color) {
+  return L.divIcon({
+    className: '',
+    html: `<svg width="26" height="34" viewBox="0 0 26 34" xmlns="http://www.w3.org/2000/svg">
+      <filter id="s"><feDropShadow dx="0" dy="1" stdDeviation="1" flood-opacity=".25"/></filter>
+      <path d="M13 0C5.82 0 0 5.82 0 13c0 9.75 13 21 13 21S26 22.75 26 13C26 5.82 20.18 0 13 0z"
+        fill="${color}" filter="url(#s)"/>
+      <circle cx="13" cy="13" r="5" fill="white" opacity=".9"/>
+    </svg>`,
+    iconSize: [26, 34], iconAnchor: [13, 34], popupAnchor: [0, -36]
+  });
+}
+
+function mkTempIcon(n) {
+  return L.divIcon({
+    className: '',
+    html: `<svg width="26" height="34" viewBox="0 0 26 34" xmlns="http://www.w3.org/2000/svg">
+      <path d="M13 0C5.82 0 0 5.82 0 13c0 9.75 13 21 13 21S26 22.75 26 13C26 5.82 20.18 0 13 0z"
+        fill="#5580aa" stroke="white" stroke-width="1.5"/>
+      <text x="13" y="17.5" text-anchor="middle" font-size="11" fill="white"
+        font-family="-apple-system,sans-serif" font-weight="700">${n}</text>
+    </svg>`,
+    iconSize: [26, 34], iconAnchor: [13, 34], popupAnchor: [0, -36]
+  });
+}
+
+// ── Render book on map ────────────────────────────────────────────────────────
+function renderBook(book) {
+  const idx = books.findIndex(b => b.id === book.id);
+  (layers[book.id] || []).forEach(l => map.removeLayer(l));
+  layers[book.id] = [];
+  if (!book.locations.length) return;
+  const color = COLORS[idx % COLORS.length];
+  if (book.locations.length > 1) {
+    const line = L.polyline(book.locations.map(l => [l.lat, l.lng]), {
+      color, weight: 2.5, opacity: 0.7, dashArray: '6,4'
+    }).addTo(map);
+    layers[book.id].push(line);
+  }
+  book.locations.forEach(loc => {
+    const m = L.marker([loc.lat, loc.lng], { icon: mkIcon(color) }).addTo(map);
+    m.bindPopup(`<div class="lpopup">
+      ${book.cover ? `<img src="${book.cover}" alt="">` : ''}
+      <div class="pt">${esc(book.title)}</div>
+      ${book.author ? `<div class="pa">${esc(book.author)}</div>` : ''}
+      ${loc.name ? `<div class="pn">📍 ${esc(loc.name)}</div>` : ''}
+      ${book.description ? `<div class="pd">${esc(book.description)}</div>` : ''}
+    </div>`);
+    layers[book.id].push(m);
+  });
+}
+
+function renderAllBooks() { books.forEach(renderBook); }
+
+// ── Temp markers ──────────────────────────────────────────────────────────────
+function drawTempMarkers() {
+  tempLayers.forEach(l => map.removeLayer(l));
+  tempLayers = [];
+  if (pickedLocs.length > 1) {
+    const line = L.polyline(pickedLocs.map(l => [l.lat, l.lng]), {
+      color: '#5580aa', weight: 2, dashArray: '4,3', opacity: 0.8
+    }).addTo(map);
+    tempLayers.push(line);
+  }
+  pickedLocs.forEach((loc, i) => {
+    const m = L.marker([loc.lat, loc.lng], { icon: mkTempIcon(i + 1) }).addTo(map);
+    tempLayers.push(m);
+  });
+}
+
+// ── Map click ─────────────────────────────────────────────────────────────────
+map.on('click', e => {
+  if (!picking) return;
+  const loc = { lat: e.latlng.lat, lng: e.latlng.lng, name: '' };
+  if (locMode === 'single') { pickedLocs = [loc]; picking = false; }
+  else pickedLocs = [...pickedLocs, loc];
+  drawTempMarkers();
+  map.getContainer().style.cursor = picking ? 'crosshair' : '';
+  renderSidebar();
+});
+
+// ── Fly to book ───────────────────────────────────────────────────────────────
+function flyTo(bi) {
+  const b = books[bi];
+  if (!b || !b.locations.length) return;
+  const lls = b.locations.map(l => [l.lat, l.lng]);
+  if (lls.length === 1) map.flyTo(lls[0], 11, { duration: 1 });
+  else map.flyToBounds(L.latLngBounds(lls).pad(0.3), { duration: 1 });
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+function switchTab(t) {
+  tab = t;
+  document.getElementById('tab-list').className = 'tab' + (t === 'list' ? ' on' : '');
+  document.getElementById('tab-add').className  = 'tab' + (t === 'add'  ? ' on' : '');
+  if (t === 'add' && !editId) resetForm();
+  renderSidebar();
+}
+
+// ── Sidebar render ────────────────────────────────────────────────────────────
+function renderSidebar() {
+  const panel = document.getElementById('panel');
+  if (tab === 'list') {
+    if (!books.length) {
+      panel.innerHTML = `<div class="empty">Noch keine Bücher eingetragen.<br>Wechsle zu „+ Hinzufügen".</div>`;
+      return;
+    }
+    panel.innerHTML = books.map((b, i) => `
+      <div class="book-item" onclick="flyTo(${i})">
+        ${b.cover ? `<img class="bthumb" src="${b.cover}" alt="">` : `<div class="bph">📖</div>`}
+        <div class="bi">
+          <div class="bt">${esc(b.title)}</div>
+          ${b.author ? `<div class="ba">${esc(b.author)}</div>` : ''}
+          <div class="bl">${b.locations.length} Ort${b.locations.length !== 1 ? 'e' : ''}</div>
+        </div>
+        <button class="delbtn" onclick="event.stopPropagation(); deleteBook('${b.id}')">×</button>
+      </div>`).join('');
+  } else {
+    panel.innerHTML = `
+      <div style="font-size:14px;font-weight:600">${editId ? 'Buch bearbeiten' : 'Neues Buch'}</div>
+
+      <div class="fg">
+        <div class="lbl">Titel *</div>
+        <input type="text" value="${esc(fTitle)}" oninput="fTitle=this.value" placeholder="Buchtitel">
+      </div>
+      <div class="fg">
+        <div class="lbl">Autor/in</div>
+        <input type="text" value="${esc(fAuthor)}" oninput="fAuthor=this.value" placeholder="Verfasser/in">
+      </div>
+      <div class="fg">
+        <div class="lbl">Beschreibung</div>
+        <textarea oninput="fDesc=this.value" rows="2" placeholder="Kurzbeschreibung oder Notiz">${esc(fDesc)}</textarea>
+      </div>
+
+      <div class="fg">
+        <div class="lbl">Cover-Bild</div>
+        <label class="cover-drop">
+          ${fCover ? `<img src="${fCover}" alt="Cover">` : ''}
+          <span style="font-size:12px">${fCover ? '✓ Bild geladen – klicken zum Ändern' : '📷 Klicken zum Hochladen'}</span>
+          <input type="file" accept="image/*" onchange="handleCover(event)" style="display:none">
+        </label>
+        <input type="url" style="margin-top:5px"
+          value="${fCover.startsWith('data:') ? '' : esc(fCover)}"
+          oninput="fCover=this.value; renderSidebar()"
+          placeholder="…oder Bild-URL einfügen">
+      </div>
+
+      <div class="fg">
+        <div class="lbl">Markierungsart</div>
+        <div class="mode-row">
+          <button class="mbtn ${locMode === 'single' ? 'on' : ''}" onclick="setMode('single')">Einzelner Ort</button>
+          <button class="mbtn ${locMode === 'route'  ? 'on' : ''}" onclick="setMode('route')">Route / mehrere</button>
+        </div>
+      </div>
+
+      <div class="fg">
+        <div class="lbl">Spielorte</div>
+        ${picking ? '<div class="hint">🗺 Klicke auf die Karte, um einen Ort zu setzen</div>' : ''}
+        <div id="plocs">${renderPLocs()}</div>
+        <button class="add-loc-btn" onclick="startPicking()">
+          ${picking ? '⏳ Warte auf Kartenklick …' : '+ Ort auf Karte wählen'}
+        </button>
+      </div>
+
+      <button class="save-btn" onclick="saveBook()">Buch speichern</button>
+      ${editId ? `<button class="cancel-btn" onclick="cancelEdit()">Abbrechen</button>` : ''}
+    `;
+  }
+}
+
+function renderPLocs() {
+  return pickedLocs.map((l, i) => `
+    <div class="ploc" style="margin-top:5px">
+      <span class="ploc-idx">${i + 1}</span>
+      <input value="${esc(l.name)}" placeholder="Ortsname (optional)"
+        oninput="pickedLocs[${i}].name = this.value">
+      <button class="rm" onclick="removeLoc(${i})">×</button>
+    </div>`).join('');
+}
+
+function esc(s = '') {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;');
+}
+
+// ── Form actions ──────────────────────────────────────────────────────────────
+function setMode(m) {
+  locMode = m;
+  if (m === 'single' && pickedLocs.length > 1) pickedLocs = [pickedLocs[0]];
+  drawTempMarkers();
+  renderSidebar();
+}
+
+function removeLoc(i) {
+  pickedLocs.splice(i, 1);
+  drawTempMarkers();
+  renderSidebar();
+}
+
+function startPicking() {
+  if (locMode === 'single' && pickedLocs.length >= 1) {
+    alert('Für „Einzelner Ort" zuerst den bestehenden Ort entfernen.'); return;
+  }
+  picking = true;
+  map.getContainer().style.cursor = 'crosshair';
+  renderSidebar();
+}
+
+function handleCover(e) {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = ev => { fCover = ev.target.result; renderSidebar(); };
+  r.readAsDataURL(f);
+}
+
+function saveBook() {
+  if (!fTitle.trim()) { alert('Bitte einen Titel eingeben.'); return; }
+  if (!pickedLocs.length) { alert('Bitte mindestens einen Ort auf der Karte markieren.'); return; }
+  const book = {
+    id: editId || Date.now().toString(),
+    title: fTitle.trim(), author: fAuthor.trim(),
+    description: fDesc.trim(), cover: fCover,
+    locations: pickedLocs.map(l => ({ ...l }))
+  };
+  const idx = books.findIndex(b => b.id === book.id);
+  if (idx >= 0) books[idx] = book; else books.push(book);
+  persist();
+  renderBook(book);
+  tempLayers.forEach(l => map.removeLayer(l)); tempLayers = [];
+  resetForm();
+  switchTab('list');
+}
+
+function resetForm() {
+  editId = null; fTitle = ''; fAuthor = ''; fDesc = ''; fCover = '';
+  pickedLocs = []; picking = false; locMode = 'single';
+  map.getContainer().style.cursor = '';
+}
+
+function cancelEdit() {
+  tempLayers.forEach(l => map.removeLayer(l)); tempLayers = [];
+  resetForm();
+  switchTab('list');
+}
+
+function deleteBook(id) {
+  if (!confirm('Buch wirklich entfernen?')) return;
+  (layers[id] || []).forEach(l => map.removeLayer(l));
+  delete layers[id];
+  books = books.filter(b => b.id !== id);
+  persist();
+  renderSidebar();
+}
+
+// ── Persist ───────────────────────────────────────────────────────────────────
+function persist() {
+  try { localStorage.setItem('litKarte5', JSON.stringify(books)); } catch {}
+}
+
+// ── Export / Import ───────────────────────────────────────────────────────────
+function exportData() {
+  const blob = new Blob([JSON.stringify(books, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'literarische-karte.json';
+  a.click();
+}
+
+function importData(e) {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = ev => {
+    try {
+      const imp = JSON.parse(ev.target.result);
+      if (Array.isArray(imp)) {
+        Object.values(layers).flat().forEach(l => map.removeLayer(l));
+        Object.keys(layers).forEach(k => delete layers[k]);
+        books = imp;
+        persist();
+        renderAllBooks();
+        renderSidebar();
+      }
+    } catch { alert('Ungültige JSON-Datei.'); }
+  };
+  r.readAsText(f);
+  e.target.value = '';
+}
+
+// ── Keyboard ──────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && picking) {
+    picking = false;
+    map.getContainer().style.cursor = '';
+    renderSidebar();
+  }
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+renderAllBooks();
+renderSidebar();
+</script>
+</body>
+</html>
